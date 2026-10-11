@@ -1,0 +1,9 @@
+[package]
+name = "fabmod-rs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.104"
+js-sys = "=0.3.85"
+monstertruck = { version = "0.4.1", features = ["full"] }
