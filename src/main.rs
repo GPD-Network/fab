@@ -6,18 +6,13 @@ use monstertruck::step::save::{
 
 const PI: Rad<f64> = Rad(std::f64::consts::PI);
 
-
-fn cylinder(base_origin: Point3, radius: f16, height: f16) ->
-  anyhow::Result<Solid> {
-
-
-    todo!()
-}
-
+use fabmod::shapes::{cylinder};
 
 fn main() -> anyhow::Result<()> {
 
     println!("Hello, world!\nThis is a test of MONSTERTRUCK!");
+
+    let cyl = cylinder(Point3::new(0.0, 0.0, 0.0), 0.45, 1.0);
 
     // Unit cuboid centred on the origin of xy plane, sitting at
     // 0 elevation, one unit high.

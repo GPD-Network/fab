@@ -721,7 +721,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "fabmod-rs"
+name = "fabmod"
 version = "0.1.0"
 dependencies = [
  "anyhow",
