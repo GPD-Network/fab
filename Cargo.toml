@@ -1,10 +1,12 @@
 [package]
-name = "fabmod"
+name = "fab"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 anyhow = "1.0.104"
 clap = { version = "4.6.7", features = ["derive"] }
+console = "0.16.6"
+directories = "6.0.0"
 js-sys = "=0.3.85"
 monstertruck = { version = "0.4.1", features = ["full"] }
