@@ -1,49 +1,71 @@
-// A struct with some trait implementations...will have:
-// 1. Metadata
-// 2. One trait function will be the construct()
+/// Data structure for automated creation and tracking of fab designs
 use std::fmt;
-use std::path::Path;
+
+use chrono::{DateTime,Local};
+use monstertruck::modeling::Solid;
+
+use crate::shapes::cube;
 
 
-struct Design<'a> {
-    title: String,
-    date: String,
-    description: String,
-    path: &'a Path,  // lifetime marker indicating shares lifetime with Design
+fn default_cube_spec() -> Solid {
+
+    // Just unwrapping bc we don't expect problems with a simple shape
+    // like a cube. More complicated shapes may encounter unexpected problems.
+    // Use standard, robust, idiomatic error handling instead of this.
+    cube(1.0).unwrap()
 }
 
 
-impl<'a> Design<'a> {
-    fn new(title: impl Into<String>,
-        description: impl Into<String>,
-        date: impl Into<String>,
-        path: &'a Path) -> Self {
+pub struct Design {
+    title: String,
+    description: String,
+    date: DateTime<Local>,
+    spec: fn() -> Solid
+}
+
+
+impl Design {
+
+    pub fn new(
+        title: impl Into<String>,
+        description: impl Into<String>
+    )
+    -> Design {
+
         Self {
             title: title.into(),
             description: description.into(),
-            date: date.into(),
-            path: path,
+            date: Local::now(),
+            spec: default_cube_spec
         }
+    }
+
+    pub fn set_spec(mut self, spec: fn() -> Solid)  -> Design {
+        self.spec = spec;
+        self
     }
 }
 
 
-impl fmt::Display for Design<'_> {
+impl fmt::Display for Design {
 
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 
         write!(
             f,
-            "{} ({})\nLocation: {}",
-            self.title, self.date, self.path.display()
+            "=== {}\nLocation: {}\n\nDescription:\n{}\n\n",
+            self.title, self.description, file!()
         )
     }
 }
 
 
-impl fmt::Debug for Design<'_> {
+impl fmt::Debug for Design {
 
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+
+        let loc = file!();
+        println!("Debug for design at {loc}");
 
         f.debug_struct("Design")
             .field("title", &self.title)
@@ -51,5 +73,4 @@ impl fmt::Debug for Design<'_> {
             .finish()
     }
 }
-
 

@@ -1,5 +1,8 @@
+use std::path::Path;
+use std::fs;
+
 use clap::{Parser, Subcommand};
-use console::Term;
+// use console::Term;
 
 
 #[derive(Parser)]
@@ -14,26 +17,21 @@ struct Cli {
     command: Commands,
 }
 
+
 #[derive(Subcommand)]
 enum Commands {
     /// Adds files to myapp
     New {
-
-        /// Name of the design; user will be prompted for it if not given
-        #[arg(long, short)]
-        name: Option<String>,
+        /// Name of the design, required
+        name: String,
 
         /// Description for the design saved to design's metadata
-        #[arg(long, short)]
+        #[arg(long, short, default_value="Describe your design here")]
         description: String,
 
-        /// Directory to use for designs, defaults to `designs` in working directory
-        #[arg(long, short='D')]
+        /// Directory to use for designs, created if it does not exist
+        #[arg(long, short='D', default_value="designs")]
         designs_dir: String,
-
-        /// Pair of shape:arg1,arg2,arg3 pairs; e.g. cylinder:(0.0,0.0,0.0),5,10 for 10mm tall cylinder with 10mm diameter base
-        #[arg(long, short)]
-        predrawn: Vec<String>,
 
         /// Whether to overwrite existing design
         #[arg(long, short='o')]
@@ -41,36 +39,56 @@ enum Commands {
     },
 }
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     // You can check for the existence of subcommands, and if found use their
     // matches just as you would the top level cmd
     match &cli.command {
-        Commands::New { name, description, designs_dir, predrawn, overwrite } => {
+        Commands::New { name, description, designs_dir, overwrite } => {
 
-            // Connect to stdout for communicating with user
-            let term = Term::stdout();
 
-            // If user provided predrawn arguments, tell them not yet used
-            if !predrawn.is_empty() {
-                term.write_line("Predrawn designs requested but this feature is not yet implemented. Sorry!")
-                    .expect("Failure writing to terminal...");
+            let designs_dir = Path::new(designs_dir);
+            let design_path = designs_dir.join("{name}.rs");
+
+            // Create designs_dir if it does not yet exist and initialize design
+            if !designs_dir.is_dir() {
+                // Create directory
+                fs::create_dir(designs_dir)?;
+                // Write starter design to design_path
+                fs::write(design_path, default_design_rs(name, description))?;
+            } else {
+                // If file exists and overwrite is false, exit
+                if design_path.exists() && !overwrite {
+                    anyhow::bail!(
+                        "Design already exists at {}, overwrite disabled.",
+                        design_path.display()
+                    )
+                }
+
+                write_default_rs(name, description, design_path)
             }
 
-            //
+
         }
     }
+
+    Ok(())
 }
 
 
-fn design_topmatter(name: String, description: String) -> anyhow::Result<String> {
+fn default_design_rs(name: &str, description: &str) -> String {
 
-    let ret = "yo";
-    let ret =
-"
-gT
-"
-
-    Ok(ret.to_string())
+    format!(
+        "\
+        /* design {name} description: {description}
+        "
+    )
 }
+
+fn write_default_rs(name, description, design_path) -> anyhow::Result<()> {
+    fs::write(design_path, default_design_rs(name, description))?;
+
+    Ok(())
+}
+
