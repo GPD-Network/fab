@@ -1,3 +1,5 @@
 /target
 *.step
 *.gcode
+designs
+Manifest.toml

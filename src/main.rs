@@ -6,6 +6,7 @@ use std::{
 
 use anyhow::Context;
 use clap::{Parser, Subcommand};
+use toml_edit::{ArrayOfTables, DocumentMut, Item, Table, value};
 
 #[derive(Parser)]
 #[command(
@@ -44,9 +45,9 @@ enum Commands {
         also_compile: bool,
     },
 
-    /// Compile and run a design
+    /// Compile and run a design, building it into something printable
     Compile {
-        /// Name of the design
+        // Name of the design
         name: String,
     },
 }
@@ -78,6 +79,48 @@ fn main() -> anyhow::Result<()> {
 
             write_default_rs(&name, &description, &design_path)?;
 
+            let cargo_text = fs::read_to_string("Cargo.toml")
+                .context(format!(
+r#"
+Could not read Cargo.toml; run fab from a Cargo project root.\
+
+Hint: Initialize new cargo project using `cargo new my-design-project`.
+"#
+))?;
+
+            let mut cargo_toml = cargo_text
+                .parse::<DocumentMut>()
+                .context("could not parse Cargo.toml")?;
+
+            // if !cargo_toml["bin"].is_array_of_tables() {
+            if !cargo_toml.contains_key("bin") {
+                cargo_toml["bin"] = Item::ArrayOfTables(ArrayOfTables::new());
+            }
+
+            // Get a reference to an array of all the "bin" listings in Cargo.toml
+            let binary_tables = cargo_toml["bin"]
+                .as_array_of_tables_mut()
+                .expect(
+                    "Error getting array of binaries listed in Cargo.toml"
+                );
+
+            // If the design binary already exists, no need to edit, clean exit
+            if binary_tables.iter().any(|bin| bin["name"].as_str() == Some(&name)) {
+                return Ok(())
+            }
+
+            // Create a new binary entry for this design
+            let mut my_binary_table = Table::new();
+            my_binary_table["name"] = value(&name);
+            my_binary_table["path"] =
+                value(design_path.into_os_string().to_str().unwrap());
+
+            // Push the new binary declaration
+            binary_tables.push(my_binary_table);
+
+            // Write updated Cargo.toml, closing Cargo.toml
+            fs::write("Cargo.toml", cargo_toml.to_string())?;
+
             if also_compile {
                 compile_design(&name)?;
             }
@@ -91,8 +134,7 @@ fn main() -> anyhow::Result<()> {
 
 fn default_design_rs(name: &str, description: &str) -> String {
     format!(
-        r#"\
-use fab::design::{{Design, default_cube_spec}};
+r#"use fab::design::{{Design, default_cube_spec}};
 
 pub fn design() -> Design {{
     Design::new({name:?}, {description:?})
@@ -100,7 +142,7 @@ pub fn design() -> Design {{
 }}
 
 fn main() -> anyhow::Result<()> {{
-    design().sync_printable()
+    design().compile()
 }}
 "#
     )
@@ -136,7 +178,7 @@ fn compile_design(name: &str) -> anyhow::Result<()> {
             .status()?
             .success(),
 
-        "Design `{name}` failed to compile or run"
+        "Rust file defining the design `{name}` failed to compile or run."
     );
 
     Ok(())

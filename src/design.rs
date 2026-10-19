@@ -19,12 +19,14 @@ use monstertruck::{
     }
 };
 
-use toml_edit::{value, ArrayOfTables, DocumentMut, Item, Table};
+use toml_edit::{value, DocumentMut};
 
 use crate::shapes::cube;
 
+const BUILD_DIR: &str = "build";
 
-fn default_cube_spec() -> Solid {
+
+pub fn default_cube_spec() -> Solid {
 
     // Just unwrapping bc we don't expect problems with a simple shape
     // like a cube. More complicated shapes may encounter unexpected problems.
@@ -32,11 +34,12 @@ fn default_cube_spec() -> Solid {
     cube(1.0).unwrap()
 }
 
+#[derive(Clone)]
 pub struct Design {
-    name: String,
-    description: String,
-    date: DateTime<Local>,
-    spec: fn() -> Solid
+    pub name: String,
+    pub description: String,
+    pub date: DateTime<Local>,
+    pub spec: fn() -> Solid
 }
 
 impl Design {
@@ -62,18 +65,25 @@ impl Design {
     }
 
     /// We compile a design by building and running the rest-based design
-    pub fn compile(self, write_path: &Path) -> anyhow::Result<()> {
+    pub fn compile(&self) -> anyhow::Result<()> {
 
         // Flatten the topology and render as STEP.
-        let compressed = (self.spec)().compress();
+        let built_spec = (self.spec)();
+        self.clone().sync_metadata()?;
+
+        let build_dir = Path::new(BUILD_DIR);
+        if !build_dir.is_dir() {
+            fs::create_dir(&build_dir)?;
+        }
+        let write_path = build_dir.join(format!("{}.step", self.name));
 
         std::fs::write(
 
-            write_path,
+            &write_path,
 
             CompleteStepDisplay::new(
 
-                StepModel::from(&compressed),
+                StepModel::from(&built_spec.compress()),
 
                 StepHeaderDescriptor {
                     organization_system: "monstertruck-doc".to_owned(),
@@ -81,7 +91,7 @@ impl Design {
                 },
 
             ).to_string()
-        )?;
+        ).context("Error writing the step file.")?;
 
         println!("Wrote design {} to step file {}.", self.name, write_path.display());
 
@@ -90,42 +100,6 @@ impl Design {
 
     pub fn sync_metadata(self) -> anyhow::Result<()> {
 
-        let cargo_text = fs::read_to_string("Cargo.toml")
-            .context(format!(
-r#"
-Could not read Cargo.toml; run fab from a Cargo project root.\
-
-Hint: Initialize new cargo project using `cargo new my-design-project`.
-"#
-))?;
-
-        let mut cargo_toml = cargo_text
-            .parse::<DocumentMut>()
-            .context("could not parse Cargo.toml")?;
-
-        if !cargo_toml["bin"].is_array_of_tables() {
-            cargo_toml["bin"] = Item::ArrayOfTables(ArrayOfTables::new());
-        }
-
-        // Get a reference to an array of all the "bin" listings in Cargo.toml
-        let binary_tables = cargo_toml["bin"]
-            .as_array_of_tables_mut()
-            .expect(
-                "Error getting array of binaries listed in Cargo.toml"
-            );
-
-        // If the design binary already exists, no need to edit, clean exit
-        if binary_tables.iter().any(|bin| bin["name"].as_str() == Some(&self.name)) {
-            return Ok(())
-        }
-
-        // Create a new binary entry for this design
-        let mut my_binary_table = Table::new();
-        my_binary_table["name"] = value(&self.name);
-        my_binary_table["path"] = value(file!());
-
-        // Push the new binary declaration
-        binary_tables.push(my_binary_table);
 
         // Now read the manifest if it exists, creating it if not
         let mut manifest_toml =
@@ -137,14 +111,13 @@ Hint: Initialize new cargo project using `cargo new my-design-project`.
             } else {
 
                 DocumentMut::new()
-        };
+            };
 
         // Create a new design entry in the auto-generated manifest
         let design_entry = manifest_toml.entry(&self.name).or_insert(toml_edit::table());
         design_entry["description"] = value(self.description);
         design_entry["date"] = value(self.date.format("%Y-%m-%d").to_string());
 
-        fs::write("Cargo.toml", cargo_toml.to_string())?;
         fs::write("Manifest.toml", manifest_toml.to_string())?;
 
         Ok(())
@@ -177,7 +150,3 @@ impl fmt::Debug for Design {
     }
 }
 
-pub fn load_design(design_path: &Path) -> anyhow::Result<Design> {
-
-    todo!()
-}
