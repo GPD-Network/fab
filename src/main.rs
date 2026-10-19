@@ -134,16 +134,25 @@ Hint: Initialize new cargo project using `cargo new my-design-project`.
 
 fn default_design_rs(name: &str, description: &str) -> String {
     format!(
-r#"use fab::design::{{Design, default_cube_spec}};
+r#"use monstertruck::modeling::Solid;
 
-pub fn design() -> Design {{
-    Design::new({name:?}, {description:?})
-        .set_spec(default_cube_spec)
-}}
+use fab::design::Design;
+use fab::shapes::cube;
 
 fn main() -> anyhow::Result<()> {{
     design().compile()
 }}
+
+pub fn design() -> Design {{
+    Design::new({name:?}, {description:?})
+        .set_spec(specification)
+}}
+
+pub fn specification() -> Solid {{
+    // Put your code here to create custom designs
+    cube(1.0).unwrap()
+}}
+
 "#
     )
 }

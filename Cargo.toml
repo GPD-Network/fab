@@ -2,7 +2,7 @@
 name = "fab"
 version = "0.1.0"
 edition = "2024"
-default-bin = "fab"
+default-run = "fab"
 
 [dependencies]
 anyhow = "1.0.104"
@@ -18,3 +18,12 @@ toml_edit = "0.25.17"
 [[bin]]
 name = "desi"
 path = "designs/desi.rs"
+
+[[bin]]
+name = "dd"
+path = "designs/dd.rs"
+
+[[bin]]
+name = "test"
+path = "designs/test.rs"
+yo = "hey"

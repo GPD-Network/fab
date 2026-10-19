@@ -28,9 +28,6 @@ const BUILD_DIR: &str = "build";
 
 pub fn default_cube_spec() -> Solid {
 
-    // Just unwrapping bc we don't expect problems with a simple shape
-    // like a cube. More complicated shapes may encounter unexpected problems.
-    // Use standard, robust, idiomatic error handling instead of this.
     cube(1.0).unwrap()
 }
 
