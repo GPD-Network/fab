@@ -14,16 +14,3 @@ directories = "6.0.0"
 js-sys = "=0.3.85"
 monstertruck = { version = "0.4.1", features = ["full"] }
 toml_edit = "0.25.17"
-
-[[bin]]
-name = "desi"
-path = "designs/desi.rs"
-
-[[bin]]
-name = "dd"
-path = "designs/dd.rs"
-
-[[bin]]
-name = "test"
-path = "designs/test.rs"
-yo = "hey"

@@ -6,6 +6,7 @@ use std::{
 };
 
 use anyhow::Context;
+use anyhow::Result as AResult;
 use chrono::{DateTime,Local};
 
 use monstertruck::{
@@ -23,8 +24,8 @@ use toml_edit::{value, DocumentMut};
 
 use crate::shapes::cube;
 
-const BUILD_DIR: &str = "build";
 
+const BUILD_DIR: &str = "build";
 
 pub fn default_cube_spec() -> Solid {
 
@@ -45,8 +46,7 @@ impl Design {
     pub fn new(
         name: impl Into<String>,
         description: impl Into<String>
-    )
-    -> Design {
+    ) -> Design {
 
         Self {
             name: name.into(),
@@ -62,7 +62,7 @@ impl Design {
     }
 
     /// We compile a design by building and running the rest-based design
-    pub fn compile(&self) -> anyhow::Result<()> {
+    pub fn compile(&self) -> AResult<()> {
 
         // Flatten the topology and render as STEP.
         let built_spec = (self.spec)();
@@ -70,7 +70,7 @@ impl Design {
 
         let build_dir = Path::new(BUILD_DIR);
         if !build_dir.is_dir() {
-            fs::create_dir(&build_dir)?;
+            fs::create_dir(build_dir)?;
         }
         let write_path = build_dir.join(format!("{}.step", self.name));
 
@@ -95,7 +95,7 @@ impl Design {
         Ok(())
     }
 
-    pub fn sync_metadata(self) -> anyhow::Result<()> {
+    pub fn sync_metadata(self) -> AResult<()> {
 
 
         // Now read the manifest if it exists, creating it if not

@@ -1,12 +1,17 @@
 use std::{
     fs,
+    io::Read,
     path::{Path, PathBuf},
     process::Command,
 };
 
-use anyhow::Context;
+use anyhow::{bail,Context,ensure};
+use anyhow::Result as AResult;
 use clap::{Parser, Subcommand};
 use toml_edit::{ArrayOfTables, DocumentMut, Item, Table, value};
+
+
+const CARGO_PATH_STR: &str = "Cargo.toml";
 
 #[derive(Parser)]
 #[command(
@@ -47,15 +52,16 @@ enum Commands {
 
     /// Compile and run a design, building it into something printable
     Compile {
-        // Name of the design
+        /// Name of the design; must already exist via fab new {name}
         name: String,
     },
 }
 
-fn main() -> anyhow::Result<()> {
+fn main() -> AResult<()> {
 
     match Cli::parse().command {
 
+        // === NEW
         Commands::New {
             name,
             description,
@@ -64,63 +70,29 @@ fn main() -> anyhow::Result<()> {
             also_compile
         } => {
 
+            // Create the directory passed by the user if necessary
             if !designs_dir.is_dir() {
                 fs::create_dir(&designs_dir)?;
             }
 
+            // Build path to the design
             let design_path = designs_dir.join(format!("{name}.rs"));
 
+            // Bail if design already exists and user didn't indicate overwrite
             if design_path.exists() && !overwrite {
-                anyhow::bail!(
+                bail!(
                     "Design already exists at {}, overwrite disabled.",
                     design_path.display()
                 );
             }
 
+            // Ensure the project's Cargo.toml is configured for fab
+            setup_cargo_toml(&name, &design_path)?;
+
+            // Create a design stub
             write_default_rs(&name, &description, &design_path)?;
 
-            let cargo_text = fs::read_to_string("Cargo.toml")
-                .context(format!(
-r#"
-Could not read Cargo.toml; run fab from a Cargo project root.\
-
-Hint: Initialize new cargo project using `cargo new my-design-project`.
-"#
-))?;
-
-            let mut cargo_toml = cargo_text
-                .parse::<DocumentMut>()
-                .context("could not parse Cargo.toml")?;
-
-            // if !cargo_toml["bin"].is_array_of_tables() {
-            if !cargo_toml.contains_key("bin") {
-                cargo_toml["bin"] = Item::ArrayOfTables(ArrayOfTables::new());
-            }
-
-            // Get a reference to an array of all the "bin" listings in Cargo.toml
-            let binary_tables = cargo_toml["bin"]
-                .as_array_of_tables_mut()
-                .expect(
-                    "Error getting array of binaries listed in Cargo.toml"
-                );
-
-            // If the design binary already exists, no need to edit, clean exit
-            if binary_tables.iter().any(|bin| bin["name"].as_str() == Some(&name)) {
-                return Ok(())
-            }
-
-            // Create a new binary entry for this design
-            let mut my_binary_table = Table::new();
-            my_binary_table["name"] = value(&name);
-            my_binary_table["path"] =
-                value(design_path.into_os_string().to_str().unwrap());
-
-            // Push the new binary declaration
-            binary_tables.push(my_binary_table);
-
-            // Write updated Cargo.toml, closing Cargo.toml
-            fs::write("Cargo.toml", cargo_toml.to_string())?;
-
+            // Compile the design if user desires
             if also_compile {
                 compile_design(&name)?;
             }
@@ -132,14 +104,18 @@ Hint: Initialize new cargo project using `cargo new my-design-project`.
     Ok(())
 }
 
+// Produce a string that defines a stub design for `fab new`
 fn default_design_rs(name: &str, description: &str) -> String {
+
     format!(
-r#"use monstertruck::modeling::Solid;
+r#"use anyhow::Result as AResult;
+
+use monstertruck::modeling::Solid;
 
 use fab::design::Design;
 use fab::shapes::cube;
 
-fn main() -> anyhow::Result<()> {{
+fn main() -> AResult<()> {{
     design().compile()
 }}
 
@@ -152,7 +128,6 @@ pub fn specification() -> Solid {{
     // Put your code here to create custom designs
     cube(1.0).unwrap()
 }}
-
 "#
     )
 }
@@ -161,7 +136,7 @@ fn write_default_rs(
     name: &str,
     description: &str,
     design_path: &Path,
-) -> anyhow::Result<()> {
+) -> AResult<()> {
 
     fs::write(
         design_path,
@@ -171,16 +146,16 @@ fn write_default_rs(
     Ok(())
 }
 
-fn compile_design(name: &str) -> anyhow::Result<()> {
+fn compile_design(name: &str) -> AResult<()> {
 
     // Without this file, cargo can't find the path to the binary
-    anyhow::ensure!(
-        Path::new("Cargo.toml").is_file(),
+    ensure!(
+        Path::new(CARGO_PATH_STR).is_file(),
         "No Cargo.toml found in the current directory"
     );
 
     // Run the compiled binary using cargo, which rebuilds it if necessary
-    anyhow::ensure!(
+    ensure!(
 
         Command::new("cargo")
             .args(["run", "--bin", name])
@@ -193,3 +168,124 @@ fn compile_design(name: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn sync_fab_cargo_dependencies() -> AResult<()> {
+
+    let path = CARGO_PATH_STR;
+    let content = fs::read_to_string(path)?;
+    let mut doc = content.parse::<DocumentMut>()?;
+
+    let required =
+r#"[dependencies]
+anyhow = "1.0.104"
+chrono = { version = "0.4.45", features = ["clock"] }
+clap = { version = "4.6.7", features = ["derive"] }
+console = "0.16.6"
+dateparser = "0.3.1"
+directories = "6.0.0"
+js-sys = "=0.3.85"
+monstertruck = { version = "0.4.1", features = ["full"] }
+toml_edit = "0.25.17"
+"#;
+
+    let required = required.parse::<DocumentMut>()?;
+
+    let dependencies_iter = required["dependencies"]
+        .as_table()
+        .unwrap()
+        .iter();
+    for (name, dependency) in dependencies_iter {
+        if doc["dependencies"].get(name).is_none() {
+            doc["dependencies"][name] = dependency.clone();
+        }
+    }
+
+    fs::write(path, doc.to_string())?;
+
+    Ok(())
+}
+
+fn setup_cargo_toml(name: &str, design_path: &Path) -> AResult<()> {
+
+    // Load or create a new Cargo.toml.
+    let mut cargo_file = fs::OpenOptions::new()
+        .read(true)
+        .append(true)
+        .create(true)
+        .open(CARGO_PATH_STR)
+        .context(format!("Error reading {CARGO_PATH_STR}"))?;
+
+    let mut cargo_text: String = cargo_file
+        .read_to_string(&mut String::new())?
+        .to_string();
+
+    // A new cargo will be empty, initialize it
+    if cargo_text.is_empty() {
+
+        // Use the user's current directory name as the cargo project name
+        let project_name = std::env::current_dir();
+
+        // Initialize Cargo.toml with
+        cargo_text = format!(
+r#"
+[package]
+name = {:?}
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+"#,
+            project_name
+        );
+
+        println!(
+"No existing Cargo.toml found. Creating new Cargo.toml with project name {:?}.",
+            project_name
+        );
+    }
+
+    // Convert text of cargo file to a TOML document
+    let mut cargo_toml = cargo_text
+        .parse::<DocumentMut>()
+        .context("Could not parse Cargo.toml")?;
+
+    // Compilation steps vary depending on presence of binaries
+    let cargo_has_binaries: bool = cargo_toml.contains_key("bin");
+
+    // Check if any bin entries exist, creating the first one if not
+    if !cargo_has_binaries {
+        cargo_toml["bin"] = Item::ArrayOfTables(ArrayOfTables::new());
+    }
+
+    // Get all binaries as an array of all the "bin" listings in Cargo.toml
+    let binary_tables = cargo_toml["bin"]
+        .as_array_of_tables_mut()
+        .expect(
+            "Error getting array of binaries listed in Cargo.toml"
+        );
+
+    // Check if the binary already exists with a closure for lazy eval
+    let binary_exists = || {
+        binary_tables
+            .iter()
+            .any(|bin| bin["name"].as_str() == Some(name))
+    };
+
+    // If the design binary already exists, no need to add, exit clean
+    if cargo_has_binaries && binary_exists() {
+        return Ok(())
+    }
+
+    // Create a new binary entry for this design
+    let mut my_binary_table = Table::new();
+    my_binary_table["name"] = value(name);
+    my_binary_table["path"] = value(design_path.to_str().unwrap());
+
+    // Push the new binary declaration
+    binary_tables.push(my_binary_table);
+
+    // Write updated Cargo.toml, closing Cargo.toml
+    fs::write(CARGO_PATH_STR, cargo_toml.to_string())?;
+
+    // Close by appending fab's dependencies to Cargo.toml if necessary
+    sync_fab_cargo_dependencies()
+}

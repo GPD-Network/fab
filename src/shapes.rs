@@ -1,11 +1,12 @@
 use std::f64::consts::TAU;
 
 use anyhow::Context;
+use anyhow::Result as AResult;
 use cgmath::{Point3, Vector3};
 use monstertruck::modeling::*;
 
 
-fn normal(azimuth_rad: f64, inclination_rad: f64) -> anyhow::Result<Vector3<f64>> {
+fn normal(azimuth_rad: f64, inclination_rad: f64) -> AResult<Vector3<f64>> {
 
     Ok(
         Vector3::new(
@@ -22,7 +23,7 @@ pub fn circle_wire(
     radius: f64,
     azimuth_turns: f64,
     inclination_turns: f64
-) -> anyhow::Result<Wire> {
+) -> AResult<Wire> {
 
     // Replace params in turns with polar coordinate variables in radians
     let theta_radians = azimuth_turns * TAU;
@@ -47,7 +48,7 @@ pub fn circle_face(
         radius: f64,
         azimuth_turns: f64,
         inclination_turns: f64
-)  -> anyhow::Result<Face> {
+)  -> AResult<Face> {
 
     Ok(
         builder::try_attach_plane(&[
@@ -63,7 +64,7 @@ pub fn cylinder(
     height: f64,
     // final two angles are given in turns, ie multiples of \tau
     axis_azimuth: f64,
-    axis_inclination: f64) -> anyhow::Result<Solid> {
+    axis_inclination: f64) -> AResult<Solid> {
 
     // Given the aziumuth and inclination
     let cylinder_axis_normal = normal(axis_azimuth, axis_inclination)?;
@@ -90,7 +91,7 @@ pub fn rotate_xyz(
     x_turns: f64,
     y_turns: f64,
     z_turns: f64,
-) -> anyhow::Result<Solid> {
+) -> AResult<Solid> {
 
     let center: Point3<f64> =
         bounding::certified_solid_bounding_box(&solid)
@@ -123,7 +124,7 @@ pub fn rotate_xyz(
 
 
 pub fn cuboid(xlen: f64, ylen: f64, zlen: f64)
-    -> anyhow::Result<Solid> {
+    -> AResult<Solid> {
 
     Ok(
         primitive::cuboid(
@@ -136,7 +137,7 @@ pub fn cuboid(xlen: f64, ylen: f64, zlen: f64)
 }
 
 
-pub fn cube(sidelen: f64) -> anyhow::Result<Solid> {
+pub fn cube(sidelen: f64) -> AResult<Solid> {
     Ok(cuboid(sidelen, sidelen, sidelen)?)
 }
 
