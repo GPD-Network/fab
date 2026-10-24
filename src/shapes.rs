@@ -219,7 +219,7 @@ pub fn circle_face(
     )
 }
 
-struct Cylinder {
+pub struct Cylinder {
     base_origin: Point3<f64>,
     radius: f64,
     height: f64,
@@ -261,6 +261,18 @@ impl Cylinder {
                 model
             }
         )
+    }
+}
+
+impl HasVolume for Cylinder {
+    fn volume(&self) -> f64 {
+        PI * self.radius.powi(2) * self.height
+    }
+}
+
+impl Shape3D for Cylinder {
+    fn model(&self) -> &MSolid {
+        &self.model
     }
 }
 
