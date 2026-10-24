@@ -22,56 +22,56 @@ use monstertruck::{
 
 use toml_edit::{value, DocumentMut};
 
-use crate::shapes::cube;
+use crate::shapes::{Cube,cube,Shape3D};
 
 
 const BUILD_DIR: &str = "build";
 
-pub fn default_cube_spec() -> Solid {
-
-    cube(1.0).unwrap()
-}
 
 #[derive(Clone)]
-pub struct Design {
+pub struct Design<T: Shape3D> {
     pub name: String,
     pub description: String,
     pub date: DateTime<Local>,
-    pub spec: fn() -> Solid
+    pub spec: fn () -> T
 }
 
-impl Design {
+impl<T: Shape3D> Design<T> {
 
     /// Create a new design with the given name
     pub fn new(
         name: impl Into<String>,
-        description: impl Into<String>
-    ) -> Design {
+        description: impl Into<String>,
+        spec:  fn() -> T,
+    ) -> Design<T> {
+
 
         Self {
             name: name.into(),
             description: description.into(),
             date: Local::now(),
-            spec: default_cube_spec
+            spec
         }
     }
 
-    pub fn set_spec(mut self, spec: fn() -> Solid)  -> Design {
+    pub fn set_spec(mut self, spec: fn() -> T)  -> Design<T> {
         self.spec = spec;
         self
     }
 
-    /// We compile a design by building and running the rest-based design
+    /// We compile a design by building and running the rust-based design
     pub fn compile(&self) -> AResult<()> {
 
         // Flatten the topology and render as STEP.
-        let built_spec = (self.spec)();
-        self.clone().sync_metadata()?;
+        let spec_shape = (self.spec)();
+        let spec_model = spec_shape.model();
 
         let build_dir = Path::new(BUILD_DIR);
+
         if !build_dir.is_dir() {
             fs::create_dir(build_dir)?;
         }
+
         let write_path = build_dir.join(format!("{}.step", self.name));
 
         std::fs::write(
@@ -80,13 +80,12 @@ impl Design {
 
             CompleteStepDisplay::new(
 
-                StepModel::from(&built_spec.compress()),
+                StepModel::from(&spec_model.compress()),
 
                 StepHeaderDescriptor {
                     organization_system: "monstertruck-doc".to_owned(),
                     ..Default::default()
                 },
-
             ).to_string()
         ).context("Error writing the step file.")?;
 
@@ -97,22 +96,27 @@ impl Design {
 
     pub fn sync_metadata(self) -> AResult<()> {
 
-
         // Now read the manifest if it exists, creating it if not
         let mut manifest_toml =
+
             if Path::new("Manifest.toml").try_exists()? {
 
                 fs::read_to_string("Manifest.toml")?
                     .parse::<DocumentMut>()
                     .context("could not parse Manifest.toml")?
+
             } else {
 
                 DocumentMut::new()
             };
 
         // Create a new design entry in the auto-generated manifest
-        let design_entry = manifest_toml.entry(&self.name).or_insert(toml_edit::table());
+        let design_entry = manifest_toml
+            .entry(&self.name)
+            .or_insert(toml_edit::table());
+
         design_entry["description"] = value(self.description);
+
         design_entry["date"] = value(self.date.format("%Y-%m-%d").to_string());
 
         fs::write("Manifest.toml", manifest_toml.to_string())?;
@@ -121,7 +125,7 @@ impl Design {
     }
 }
 
-impl fmt::Display for Design {
+impl<T: Shape3D> fmt::Display for Design<T> {
 
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 
@@ -133,12 +137,9 @@ impl fmt::Display for Design {
     }
 }
 
-impl fmt::Debug for Design {
+impl<T: Shape3D> fmt::Debug for Design<T> {
 
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-
-        let loc = file!();
-        println!("Debug for design at {loc}");
 
         f.debug_struct("Design")
             .field("name", &self.name)

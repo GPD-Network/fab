@@ -182,6 +182,7 @@ clap = { version = "4.6.7", features = ["derive"] }
 console = "0.16.6"
 dateparser = "0.3.1"
 directories = "6.0.0"
+fab = { git = "https://github.com/gpd-network/fab", version = "0.1.0" }
 js-sys = "=0.3.85"
 monstertruck = { version = "0.4.1", features = ["full"] }
 toml_edit = "0.25.17"
@@ -218,32 +219,35 @@ fn setup_cargo_toml(name: &str, design_path: &Path) -> AResult<()> {
         .read_to_string(&mut String::new())?
         .to_string();
 
-    // A new cargo will be empty, initialize it
-    if cargo_text.is_empty() {
+    if !cargo_text.contains("package") {
 
         // Use the user's current directory name as the cargo project name
-        let project_name = std::env::current_dir();
+        let project_dir  = std::env::current_dir()?;
 
-        // Initialize Cargo.toml with
-        cargo_text = format!(
+        let project_name = project_dir
+            .file_name()
+            .and_then(|name| name.to_str());
+
+        let mut new_cargo_text = format!(
 r#"
 [package]
 name = {:?}
 version = "0.1.0"
 edition = "2024"
 
-[dependencies]
 "#,
-            project_name
+            project_name.unwrap()
         );
 
-        println!(
-"No existing Cargo.toml found. Creating new Cargo.toml with project name {:?}.",
-            project_name
-        );
+        if !cargo_text.contains("dependencies") {
+            new_cargo_text.push_str(&format!("\n[dependencies]"))
+        }
+
+        cargo_text = new_cargo_text
     }
 
     // Convert text of cargo file to a TOML document
+    println!("{cargo_text}");
     let mut cargo_toml = cargo_text
         .parse::<DocumentMut>()
         .context("Could not parse Cargo.toml")?;
