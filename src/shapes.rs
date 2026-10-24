@@ -12,49 +12,76 @@
 //! ```
 //!
 //! Can also make cylinders
-use std::f64::consts::{PI,TAU};
+use std::f64::consts::{PI, TAU};
 
+use anyhow::Context;
 use anyhow::Result as AResult;
-use cgmath::{Point3, Vector3};
+use cgmath::{Point3, Rad, Vector3};
 // The following monstertruck imports are perhaps overkill,
 // but I was getting confused about what came from this
 // library, fab, and what came from monstertruck.
 use monstertruck::{
     core::control_point::ControlPoint,
     modeling::{
+        bounding as mbounding,
         builder as mbuilder,
+        primitive as mprimitive,
         BoundingBox as MBoundingBox,
         Face as MFace,
-        primitive as mprimitive,
         Solid as MSolid,
-        Wire as MWire
+        Wire as MWire,
     },
 };
 
+pub trait HasVolume {
+    fn volume(&self) -> f64;
+}
 
-pub trait HasVolume { fn volume(&self) -> f64; }
+pub trait Shape3D: HasVolume {
+    fn model(&self) -> &MSolid;
+}
 
-pub trait Shape3D: HasVolume { fn model(&self) -> &MSolid; }
+macro_rules! impl_shape3d {
+    ($shape:ty) => {
+        impl Shape3D for $shape {
+            fn model(&self) -> &MSolid {
+                &self.model
+            }
+        }
+    };
+}
+
+macro_rules! f64_accessors {
+    ($shape:ty { $($field:ident),* $(,)? }) => {
+        impl $shape {
+            $(
+                pub fn $field(&self) -> f64 {
+                    self.$field
+                }
+            )*
+        }
+    };
+}
 
 pub struct Cuboid {
     xlen: f64,
     ylen: f64,
     zlen: f64,
-    pub model: MSolid
+    pub model: MSolid,
 }
 
+f64_accessors!(Cuboid { xlen, ylen, zlen });
+
 impl Cuboid {
-    pub fn xlen(&self) -> f64 { self.xlen }
-    pub fn ylen(&self) -> f64 { self.ylen }
-    pub fn zlen(&self) -> f64 { self.zlen }
-
     pub fn new(xlen: f64, ylen: f64, zlen: f64) -> AResult<Cuboid> {
-
         let model = cuboid_model(xlen, ylen, zlen)?;
 
-        Ok(
-            Cuboid { xlen, ylen, zlen, model }
-        )
+        Ok(Cuboid {
+            xlen,
+            ylen,
+            zlen,
+            model,
+        })
     }
 }
 
@@ -64,11 +91,7 @@ impl HasVolume for Cuboid {
     }
 }
 
-impl Shape3D for Cuboid {
-    fn model(&self) -> &MSolid {
-        &self.model
-    }
-}
+impl_shape3d!(Cuboid);
 
 /// Create a [hexahedron](https://en.wikipedia.org/wiki/Hexahedron) with rectangular sides, i.e., a generalized cube
 pub fn cuboid(xlen: f64, ylen: f64, zlen: f64) -> AResult<Cuboid> {
@@ -76,33 +99,26 @@ pub fn cuboid(xlen: f64, ylen: f64, zlen: f64) -> AResult<Cuboid> {
 }
 
 // Private helper to create the monstertruck Solid model of
-fn cuboid_model(xlen: f64, ylen: f64, zlen: f64)
-    -> AResult<MSolid> {
-
-    Ok(
-        mprimitive::cuboid(
-            MBoundingBox::from_iter([
-                Point3::origin(),
-                Point3::new(xlen, ylen, zlen)
-            ])
-        )
-    )
+fn cuboid_model(xlen: f64, ylen: f64, zlen: f64) -> AResult<MSolid> {
+    Ok(mprimitive::cuboid(MBoundingBox::from_iter([
+        Point3::origin(),
+        Point3::new(xlen, ylen, zlen),
+    ])))
 }
 
 pub struct Cube {
     sidelen: f64,
-    model: MSolid
+    model: MSolid,
 }
+
+f64_accessors!(Cube { sidelen });
 
 impl Cube {
     pub fn new(sidelen: f64) -> AResult<Cube> {
         let model = cube_model(sidelen)?;
 
-        Ok(
-            Cube { sidelen, model }
-        )
+        Ok(Cube { sidelen, model })
     }
-    pub fn sidelen(&self) -> f64 { self.sidelen }
 }
 
 impl HasVolume for Cube {
@@ -111,11 +127,7 @@ impl HasVolume for Cube {
     }
 }
 
-impl Shape3D for Cube {
-    fn model(&self) -> &MSolid {
-        &self.model
-    }
-}
+impl_shape3d!(Cube);
 
 pub fn cube(sidelen: f64) -> AResult<Cube> {
     Cube::new(sidelen)
@@ -126,54 +138,46 @@ fn cube_model(sidelen: f64) -> AResult<MSolid> {
     cuboid_model(sidelen, sidelen, sidelen)
 }
 
-
 /// A 3D ball represented by its center, radius, and `monstertruck` solid model.
-/// See [monstertruck struct,
-/// Solid](https://docs.rs/monstertruck-topology/0.4.1/monstertruck_topology/struct.Solid.html)
+/// See [`monstertruck`'s `Solid` struct](https://docs.rs/monstertruck-topology/0.4.1/monstertruck_topology/struct.Solid.html)
 ///
 /// Use [`ball`], which wraps [`Ball::new`] to create one.
 ///
 /// # Examples
 /// ```
-///
-/// ```
 pub struct Ball {
     center: Point3<f64>,
     radius: f64,
-    pub model: MSolid
+    pub model: MSolid,
 }
+
+f64_accessors!(Ball { radius });
 
 impl HasVolume for Ball {
     /// Use exact calculation for volume of a ball
     fn volume(&self) -> f64 {
-        (4.0 / 3.0) * PI * self.radius.powi(3)
+        (4.0 / 3.0) * PI * self.radius().powi(3)
     }
 }
 
-impl Shape3D for Ball {
-    /// Access underlying monstertruck Solid model of the ball
-    fn model(&self) -> &MSolid {
-        &self.model
-    }
-}
+impl_shape3d!(Ball);
 
 impl Ball {
-
     /// Create new ball with given radius and centre point
     pub fn new(radius: f64, center: Point3<f64>) -> AResult<Self> {
-
         let model = ball_model(center, radius)?;
 
-        Ok(
-            Self { radius, center, model }
-        )
+        Ok(Self {
+            radius,
+            center,
+            model,
+        })
     }
 
     /// Returns ball center
-    pub fn center(&self) -> Point3<f64> { self.center }
-
-    /// Returns ball radius
-    pub fn radius(&self) -> f64 { self.radius }
+    pub fn center(&self) -> Point3<f64> {
+        self.center
+    }
 }
 
 /// Convenience constructor for a new Ball instance
@@ -182,41 +186,29 @@ pub fn ball(center: Point3<f64>, radius: f64) -> AResult<Ball> {
 }
 
 // Create intermediate monstertruck Solid model for use by Ball constructor
-fn ball_model(center: Point3<f64>, radius: f64)  -> AResult<MSolid> {
-
-    Ok(
-        MSolid::new(
-                vec![
-                    mbuilder::revolve_wire(
-                        &circle_wire(
-                            center,
-                            radius,
-                            0.0,
-                            0.0
-                        )?,
-                        center,
-                        Vector3::unit_y(),
-                        mbuilder::SweepAngle::Closed,
-                        10
-                    )
-                ]
-            )
-    )
+fn ball_model(center: Point3<f64>, radius: f64) -> AResult<MSolid> {
+    Ok(MSolid::new(vec![mbuilder::revolve_wire(
+        &circle_wire(center, radius, 0.0, 0.0)?,
+        center,
+        Vector3::unit_y(),
+        mbuilder::SweepAngle::Closed,
+        10,
+    )]))
 }
 
 /// A circular face, i.e., a 2D circular plane
 pub fn circle_face(
-        base_origin: Point3<f64>,
-        radius: f64,
-        azimuth_turns: f64,
-        inclination_turns: f64
-)  -> AResult<MFace> {
-
-    Ok(
-        mbuilder::try_attach_plane(&[
-            circle_wire(base_origin, radius, azimuth_turns, inclination_turns)?
-        ])?
-    )
+    base_origin: Point3<f64>,
+    radius: f64,
+    azimuth_turns: f64,
+    inclination_turns: f64,
+) -> AResult<MFace> {
+    Ok(mbuilder::try_attach_plane(&[circle_wire(
+        base_origin,
+        radius,
+        azimuth_turns,
+        inclination_turns,
+    )?])?)
 }
 
 pub struct Cylinder {
@@ -225,72 +217,70 @@ pub struct Cylinder {
     height: f64,
     axis_azimuth: f64,
     axis_inclination: f64,
-    model: MSolid
+    model: MSolid,
 }
 
-impl Cylinder {
+f64_accessors!(Cylinder {
+    radius,
+    height,
+    axis_azimuth,
+    axis_inclination,
+});
 
-    pub fn base_origin(&self) -> Point3<f64> { self.base_origin }
-    pub fn radius(&self) -> f64 { self.radius }
-    pub fn height(&self) -> f64 { self.height }
-    pub fn axis_azimuth(&self) -> f64 { self.axis_azimuth }
-    pub fn axis_inclination(&self) -> f64 { self.axis_inclination }
+impl Cylinder {
+    pub fn base_origin(&self) -> Point3<f64> {
+        self.base_origin
+    }
 
     pub fn new(
         base_origin: Point3<f64>,
         radius: f64,
         height: f64,
         axis_azimuth: f64,
-        axis_inclination: f64
+        axis_inclination: f64,
     ) -> AResult<Cylinder> {
         let model = cylinder_model(
             base_origin,
             radius,
             height,
             axis_azimuth,
-            axis_inclination
+            axis_inclination,
         )?;
 
-        Ok(
-            Cylinder {
-                base_origin,
-                radius,
-                height,
-                axis_azimuth,
-                axis_inclination,
-                model
-            }
-        )
+        Ok(Cylinder {
+            base_origin,
+            radius,
+            height,
+            axis_azimuth,
+            axis_inclination,
+            model,
+        })
     }
 }
 
 impl HasVolume for Cylinder {
     fn volume(&self) -> f64 {
-        PI * self.radius.powi(2) * self.height
+        PI * self.radius().powi(2) * self.height()
     }
 }
 
-impl Shape3D for Cylinder {
-    fn model(&self) -> &MSolid {
-        &self.model
-    }
-}
+impl_shape3d!(Cylinder);
 
-/// Cylinder anchored at its base's center; points along axis angle paramters given as fraction [0.0, 1.0] of a full turn around 2pi radians
+/// Cylinder anchored at its base's center; points along axis angle parameters
+/// given as fractions [0.0, 1.0] of a full turn around 2π radians.
 pub fn cylinder(
-        base_origin: Point3<f64>,
-        radius: f64,
-        height: f64,
-        axis_azimuth: f64,
-        axis_inclination: f64
-    ) -> AResult<Cylinder> {
-
+    base_origin: Point3<f64>,
+    radius: f64,
+    height: f64,
+    axis_azimuth: f64,
+    axis_inclination: f64,
+) -> AResult<Cylinder> {
     Cylinder::new(
         base_origin,
         radius,
         height,
         axis_azimuth,
-        axis_inclination
+        axis_inclination,
     )
 }
 
@@ -299,36 +289,29 @@ fn cylinder_model(
     radius: f64,
     height: f64,
     axis_azimuth: f64,
-    axis_inclination: f64) -> AResult<MSolid> {
-
-    // Given the aziumuth and inclination
+    axis_inclination: f64,
+) -> AResult<MSolid> {
+    // Given the azimuth and inclination
     let cylinder_axis_normal = unit_direction(axis_azimuth, axis_inclination)?;
 
-    Ok(
-        mbuilder::extrude(
-
-            &circle_face(
-                base_origin,
-                radius,
-                axis_azimuth,
-                axis_inclination,
-            )?,
-
-            height * cylinder_axis_normal
-        )
-    )
+    Ok(mbuilder::extrude(
+        &circle_face(
+            base_origin,
+            radius,
+            axis_azimuth,
+            axis_inclination,
+        )?,
+        height * cylinder_axis_normal,
+    ))
 }
 
 /// Find the normal to the plane defined by the azimuthal and inclination angles
 pub fn unit_direction(azimuth_rad: f64, inclination_rad: f64) -> AResult<Vector3<f64>> {
-
-    Ok(
-        Vector3::new(
-            inclination_rad.sin() * azimuth_rad.cos(),
-            inclination_rad.sin() * azimuth_rad.sin(),
-            inclination_rad.cos(),
-        )
-    )
+    Ok(Vector3::new(
+        inclination_rad.sin() * azimuth_rad.cos(),
+        inclination_rad.sin() * azimuth_rad.sin(),
+        inclination_rad.cos(),
+    ))
 }
 
 /// Create a 1D circle
@@ -336,60 +319,54 @@ pub fn circle_wire(
     base_origin: Point3<f64>,
     radius: f64,
     azimuth_turns: f64,
-    inclination_turns: f64
+    inclination_turns: f64,
 ) -> AResult<MWire> {
-
     // Replace params in turns with polar coordinate variables in radians
     let theta_radians = azimuth_turns * TAU;
     let phi_radians = inclination_turns * TAU;
 
     let circle_normal = unit_direction(theta_radians, phi_radians)?;
 
-    Ok(
-        mbuilder::revolve(
-            &mbuilder::vertex(base_origin),
-            Point3::new(radius, 0.0, 0.0),
-            circle_normal,
-            mbuilder::SweepAngle::Closed,
-            10
-        )
-    )
+    Ok(mbuilder::revolve(
+        &mbuilder::vertex(base_origin),
+        Point3::new(radius, 0.0, 0.0),
+        circle_normal,
+        mbuilder::SweepAngle::Closed,
+        10,
+    ))
 }
 
-// /// Rotate a solid around its auto-calculated center
-// pub fn rotate_xyz(
-//     solid: MSolid,
-//     x_turns: f64,
-//     y_turns: f64,
-//     z_turns: f64,
-// ) -> AResult<MSolid> {
+/// Rotate a solid around its auto-calculated center
+pub fn rotate_xyz(
+    solid: MSolid,
+    x_turns: f64,
+    y_turns: f64,
+    z_turns: f64,
+) -> AResult<MSolid> {
+    let center: Point3<f64> = mbounding::certified_solid_bounding_box(&solid)
+        .with_context(|| "Failed to extract bounding box.")?
+        .center();
 
-//     let center: Point3<f64> =
-//         mbounding::certified_solid_bounding_box(&solid)
-//             .with_context(||  "Failed to extract bounding box.")?
-//             .center();
+    let solid = mbuilder::rotated(
+        &solid,
+        center,
+        Vector3::unit_x(),
+        Rad(x_turns * TAU),
+    );
 
-//     let solid = mbuilder::rotated(
-//         &solid,
-//         center,
-//         Vector3::unit_x(),
-//         Rad(x_turns * TAU),
-//     );
+    let solid = mbuilder::rotated(
+        &solid,
+        center,
+        Vector3::unit_y(),
+        Rad(y_turns * TAU),
+    );
 
-//     let solid = mbuilder::rotated(
-//         &solid,
-//         center,
-//         Vector3::unit_y(),
-//         Rad(y_turns * TAU),
-//     );
+    let solid = mbuilder::rotated(
+        &solid,
+        center,
+        Vector3::unit_z(),
+        Rad(z_turns * TAU),
+    );
 
-//     let solid = mbuilder::rotated(
-//         &solid,
-//         center,
-//         Vector3::unit_z(),
-//         Rad(z_turns * TAU),
-//     );
-
-//     Ok(solid)
-// }
-
+    Ok(solid)
+}
