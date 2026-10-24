@@ -9,20 +9,15 @@ use anyhow::Context;
 use anyhow::Result as AResult;
 use chrono::{DateTime,Local};
 
-use monstertruck::{
-
-    modeling::Solid,
-
-    step::save::{
+use monstertruck::step::save::{
         CompleteStepDisplay,
         StepHeaderDescriptor,
         StepModel
-    }
-};
+    };
 
 use toml_edit::{value, DocumentMut};
 
-use crate::shapes::{Cube,cube,Shape3D};
+use crate::shapes::Shape3D;
 
 
 const BUILD_DIR: &str = "build";
