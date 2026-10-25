@@ -22,6 +22,10 @@ use cgmath::{Point3, Rad, Vector3};
 // library, fab, and what came from monstertruck.
 use monstertruck::{
     core::control_point::ControlPoint,
+    meshing::{
+        analyzers::CalcVolume,
+        tessellation::{MeshableShape,MeshedShape}
+    },
     modeling::{
         bounding as mbounding,
         builder as mbuilder,
@@ -31,6 +35,7 @@ use monstertruck::{
         Solid as MSolid,
         Wire as MWire,
     },
+    solid as msolid
 };
 
 pub trait HasVolume {
@@ -211,6 +216,7 @@ pub fn circle_face(
     )?])?)
 }
 
+/// A cylinder with properties radius, height, and axis pointing located at `base_origin`
 pub struct Cylinder {
     base_origin: Point3<f64>,
     radius: f64,
@@ -228,10 +234,13 @@ f64_accessors!(Cylinder {
 });
 
 impl Cylinder {
+
+    /// Access the base_origin, i.e., location of the center of the base
     pub fn base_origin(&self) -> Point3<f64> {
         self.base_origin
     }
 
+    /// Create new Cylinder instance
     pub fn new(
         base_origin: Point3<f64>,
         radius: f64,
@@ -294,15 +303,35 @@ fn cylinder_model(
     // Given the azimuth and inclination
     let cylinder_axis_normal = unit_direction(axis_azimuth, axis_inclination)?;
 
-    Ok(mbuilder::extrude(
-        &circle_face(
-            base_origin,
-            radius,
-            axis_azimuth,
-            axis_inclination,
-        )?,
-        height * cylinder_axis_normal,
-    ))
+    Ok(
+        mbuilder::extrude(
+            &circle_face(
+                base_origin,
+                radius,
+                axis_azimuth,
+                axis_inclination,
+            )?,
+            height * cylinder_axis_normal
+        )
+    )
+}
+
+/// Representation of 3D monstertruck solid made from composing other solids
+pub struct CompositeShape3D {
+    pub model: MSolid
+}
+
+impl_shape3d!(CompositeShape3D);
+
+/// A composite shape has no volume formula; this uses monstertruck triangulation
+impl HasVolume for CompositeShape3D {
+    fn volume(&self) -> f64 {
+
+        self.model()
+            .triangulation(TRIANGULATION_TOL)
+            .to_polygon()
+            .volume()
+    }
 }
 
 /// Find the normal to the plane defined by the azimuthal and inclination angles
@@ -321,10 +350,12 @@ pub fn circle_wire(
     azimuth_turns: f64,
     inclination_turns: f64,
 ) -> AResult<MWire> {
-    // Replace params in turns with polar coordinate variables in radians
+
+    // Replace params given in turns with polar coordinate variables in radians
     let theta_radians = azimuth_turns * TAU;
     let phi_radians = inclination_turns * TAU;
 
+    // Circles' normal is ẑ if phi=0; theta is xy rotation, phi angle from ẑ
     let circle_normal = unit_direction(theta_radians, phi_radians)?;
 
     Ok(mbuilder::revolve(
@@ -370,3 +401,41 @@ pub fn rotate_xyz(
 
     Ok(solid)
 }
+
+/// Add two fab shapes together to get a third that joins the two, if possible
+pub fn add(shape1: &impl Shape3D, shape2: &impl Shape3D) -> AResult<CompositeShape3D> {
+
+    let result_model = msolid::or(
+        shape1.model(),
+        shape2.model(),
+        TRIANGULATION_TOL
+    )?;
+
+    Ok(
+        CompositeShape3D { model: result_model }
+    )
+}
+
+/// Subtract one fab shape (shape2) from another (shape1) to get a third resulting shape
+pub fn subtract(shape1: &impl Shape3D, shape2: &impl Shape3D) -> AResult<CompositeShape3D> {
+
+    // Clone shape 2 model because we'll need to negate it to prep for subtract
+    let mut to_remove = shape2.model().clone();
+    // Prepare shape2 to subtract from shape 1
+    to_remove.not();
+
+    // Create resulting model that takes shape 2 from shape 1
+    let result_model = msolid::and(
+        shape1.model(),
+        &to_remove,
+        TRIANGULATION_TOL
+    )?;
+
+    Ok (
+        CompositeShape3D { model: result_model }
+    )
+}
+
+/// Tolerance used by monstertruck in creating printable 3D models
+const TRIANGULATION_TOL: f64 = 0.01;
+
