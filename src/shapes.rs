@@ -3,17 +3,6 @@
 //! This module provides convenience wrappers around more primitive features of
 //! [monstertruck](https://docs.rs/monstertruck/latest/monstertruck/).
 //!
-//! # Examples
-//!
-//! Cuboid is a generalized cube, aka rectangular prism, can use either name:
-//! [cuboid] or [rectangular_prism].
-//!
-//! ```
-//! use fab::shapes::{cuboid,cube}
-//!
-//! ```
-//!
-//! Can also make cylinders
 use std::f64::consts::{PI, TAU};
 
 use anyhow::Context;
@@ -414,17 +403,6 @@ pub fn rotate_xyz(
 
 /// Add two fab shapes together to get a third that joins the two, if possible
 ///
-/// # Examples
-///
-/// ```
-/// use fab::shapes::*;
-///
-/// // Cubes/cuboids have their origin corner at Euclidian origin
-/// let bigger_cube = cube(1.0);
-/// let smaller_cube = cube(0.5);
-/// let result_cube = bigger_cube.subtract(smaller_cube);
-/// assert_eq!(result_cube.volume(), 1.0 - 0.125);
-/// ```
 pub fn add(shape1: &impl Shape3D, shape2: &impl Shape3D) -> AResult<CompositeShape3D> {
 
     let result_model = msolid::or(
