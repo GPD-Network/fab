@@ -15,3 +15,13 @@ directories = "6.0.0"
 js-sys = "=0.3.85"
 monstertruck = { version = "0.4.1", features = ["full"] }
 toml_edit = "0.25.17"
+
+[package.metadata.docs.rs]
+cargo_args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
+
+[lints.rustdoc]
+private_doc_tests = "warn"
+missing_docs = "deny"
+missing_doc_code_examples = "warn"
+redundant_explicit_links = "deny"
+unescaped_backticks = "deny"

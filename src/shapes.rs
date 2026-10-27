@@ -5,10 +5,12 @@
 //!
 //! # Examples
 //!
-//! Cuboid is a generalized cube, also called a rectangular prism, use either name
+//! Cuboid is a generalized cube, aka rectangular prism, can use either name:
+//! [cuboid] or [rectangular_prism].
 //!
 //! ```
-//! use fab::shapes::{cuboid,rectangular_prism,cube}
+//! use fab::shapes::{cuboid,cube}
+//!
 //! ```
 //!
 //! Can also make cylinders
@@ -39,10 +41,12 @@ use monstertruck::{
 };
 
 pub trait HasVolume {
+    /// We define volume for implementations of Shape3D trait
     fn volume(&self) -> f64;
 }
 
 pub trait Shape3D: HasVolume {
+    /// The presence of a monstertruck::builder::Solid
     fn model(&self) -> &MSolid;
 }
 
@@ -68,6 +72,7 @@ macro_rules! f64_accessors {
     };
 }
 
+#[derive(Debug,PartialEq)]
 pub struct Cuboid {
     xlen: f64,
     ylen: f64,
@@ -103,12 +108,16 @@ pub fn cuboid(xlen: f64, ylen: f64, zlen: f64) -> AResult<Cuboid> {
     Cuboid::new(xlen, ylen, zlen)
 }
 
-// Private helper to create the monstertruck Solid model of
+// Private helper to create the monstertruck Solid model of a cuboid
 fn cuboid_model(xlen: f64, ylen: f64, zlen: f64) -> AResult<MSolid> {
-    Ok(mprimitive::cuboid(MBoundingBox::from_iter([
-        Point3::origin(),
-        Point3::new(xlen, ylen, zlen),
-    ])))
+    Ok(
+        mprimitive::cuboid(
+            MBoundingBox::from_iter([
+                Point3::origin(),
+                Point3::new(xlen, ylen, zlen),
+            ])
+        )
+    )
 }
 
 pub struct Cube {
@@ -146,13 +155,15 @@ fn cube_model(sidelen: f64) -> AResult<MSolid> {
 /// A 3D ball represented by its center, radius, and `monstertruck` solid model.
 /// See [`monstertruck`'s `Solid` struct](https://docs.rs/monstertruck-topology/0.4.1/monstertruck_topology/struct.Solid.html)
 ///
-/// Use [`ball`], which wraps [`Ball::new`] to create one.
+/// Use [`ball`], which wraps [`Ball::new`], to create one.
 ///
 /// # Examples
 /// ```
+/// ```
+#[derive(Debug,PartialEq)]
 pub struct Ball {
-    center: Point3<f64>,
     radius: f64,
+    center: Point3<f64>,
     pub model: MSolid,
 }
 
@@ -168,9 +179,10 @@ impl HasVolume for Ball {
 impl_shape3d!(Ball);
 
 impl Ball {
+
     /// Create new ball with given radius and centre point
     pub fn new(radius: f64, center: Point3<f64>) -> AResult<Self> {
-        let model = ball_model(center, radius)?;
+        let model = ball_model(radius, center)?;
 
         Ok(Self {
             radius,
@@ -186,12 +198,12 @@ impl Ball {
 }
 
 /// Convenience constructor for a new Ball instance
-pub fn ball(center: Point3<f64>, radius: f64) -> AResult<Ball> {
+pub fn ball(radius: f64, center: Point3<f64>) -> AResult<Ball> {
     Ball::new(radius, center)
 }
 
 // Create intermediate monstertruck Solid model for use by Ball constructor
-fn ball_model(center: Point3<f64>, radius: f64) -> AResult<MSolid> {
+fn ball_model(radius:f64, center: Point3<f64>) -> AResult<MSolid> {
     Ok(MSolid::new(vec![mbuilder::revolve_wire(
         &circle_wire(center, radius, 0.0, 0.0)?,
         center,
@@ -203,22 +215,27 @@ fn ball_model(center: Point3<f64>, radius: f64) -> AResult<MSolid> {
 
 /// A circular face, i.e., a 2D circular plane
 pub fn circle_face(
-    base_origin: Point3<f64>,
     radius: f64,
     azimuth_turns: f64,
     inclination_turns: f64,
+    base_origin: Point3<f64>,
 ) -> AResult<MFace> {
-    Ok(mbuilder::try_attach_plane(&[circle_wire(
-        base_origin,
-        radius,
-        azimuth_turns,
-        inclination_turns,
-    )?])?)
+
+    Ok(mbuilder::try_attach_plane(
+        &[
+            circle_wire(
+                base_origin,
+                radius,
+                azimuth_turns,
+                inclination_turns
+            )?
+        ])?
+    )
 }
 
 /// A cylinder with properties radius, height, and axis pointing located at `base_origin`
+#[derive(Debug,PartialEq)]
 pub struct Cylinder {
-    base_origin: Point3<f64>,
     radius: f64,
     height: f64,
     axis_azimuth: f64,
@@ -235,21 +252,15 @@ f64_accessors!(Cylinder {
 
 impl Cylinder {
 
-    /// Access the base_origin, i.e., location of the center of the base
-    pub fn base_origin(&self) -> Point3<f64> {
-        self.base_origin
-    }
-
     /// Create new Cylinder instance
     pub fn new(
-        base_origin: Point3<f64>,
         radius: f64,
         height: f64,
         axis_azimuth: f64,
         axis_inclination: f64,
     ) -> AResult<Cylinder> {
+
         let model = cylinder_model(
-            base_origin,
             radius,
             height,
             axis_azimuth,
@@ -257,7 +268,6 @@ impl Cylinder {
         )?;
 
         Ok(Cylinder {
-            base_origin,
             radius,
             height,
             axis_azimuth,
@@ -272,29 +282,27 @@ impl HasVolume for Cylinder {
         PI * self.radius().powi(2) * self.height()
     }
 }
-
 impl_shape3d!(Cylinder);
 
-/// Cylinder anchored at its base's center; points along axis angle parameters
-/// given as fractions [0.0, 1.0] of a full turn around 2π radians.
+/// Cylinder anchored with the base of its center at the Euclidian origin; its
+/// axis is rotated according to the azimuth (rotation in xy plane) and
+/// inclination (rotation "down" from aligned with the z axis, where 0 is
+/// aligned with the axis).
 pub fn cylinder(
-    base_origin: Point3<f64>,
     radius: f64,
     height: f64,
     axis_azimuth: f64,
     axis_inclination: f64,
 ) -> AResult<Cylinder> {
     Cylinder::new(
-        base_origin,
         radius,
         height,
         axis_azimuth,
         axis_inclination,
     )
 }
-
+// Wraps monstertruck primitives to create a monstertruck solid cylinder
 fn cylinder_model(
-    base_origin: Point3<f64>,
     radius: f64,
     height: f64,
     axis_azimuth: f64,
@@ -306,10 +314,10 @@ fn cylinder_model(
     Ok(
         mbuilder::extrude(
             &circle_face(
-                base_origin,
                 radius,
                 axis_azimuth,
                 axis_inclination,
+                Point3::origin(),
             )?,
             height * cylinder_axis_normal
         )
@@ -320,7 +328,6 @@ fn cylinder_model(
 pub struct CompositeShape3D {
     pub model: MSolid
 }
-
 impl_shape3d!(CompositeShape3D);
 
 /// A composite shape has no volume formula; this uses monstertruck triangulation
@@ -358,13 +365,16 @@ pub fn circle_wire(
     // Circles' normal is ẑ if phi=0; theta is xy rotation, phi angle from ẑ
     let circle_normal = unit_direction(theta_radians, phi_radians)?;
 
-    Ok(mbuilder::revolve(
-        &mbuilder::vertex(base_origin),
-        Point3::new(radius, 0.0, 0.0),
-        circle_normal,
-        mbuilder::SweepAngle::Closed,
-        10,
-    ))
+    Ok(
+        // Use monstertruck's builder to revolve a point at x=radius 2
+        mbuilder::revolve(
+            &mbuilder::vertex(base_origin),
+            Point3::new(radius, 0.0, 0.0),
+            circle_normal,
+            mbuilder::SweepAngle::Closed,
+            10,
+        )
+    )
 }
 
 /// Rotate a solid around its auto-calculated center
@@ -403,6 +413,18 @@ pub fn rotate_xyz(
 }
 
 /// Add two fab shapes together to get a third that joins the two, if possible
+///
+/// # Examples
+///
+/// ```
+/// use fab::shapes::*;
+///
+/// // Cubes/cuboids have their origin corner at Euclidian origin
+/// let bigger_cube = cube(1.0);
+/// let smaller_cube = cube(0.5);
+/// let result_cube = bigger_cube.subtract(smaller_cube);
+/// assert_eq!(result_cube.volume(), 1.0 - 0.125);
+/// ```
 pub fn add(shape1: &impl Shape3D, shape2: &impl Shape3D) -> AResult<CompositeShape3D> {
 
     let result_model = msolid::or(
@@ -416,11 +438,17 @@ pub fn add(shape1: &impl Shape3D, shape2: &impl Shape3D) -> AResult<CompositeSha
     )
 }
 
-/// Subtract one fab shape (shape2) from another (shape1) to get a third resulting shape
-pub fn subtract(shape1: &impl Shape3D, shape2: &impl Shape3D) -> AResult<CompositeShape3D> {
+/// Subtract one fab shape (shape2) from another (shape1) to get a third
+/// resulting shape represented as a [CompositeShape3D].
+///
+pub fn subtract(
+    shape1: &impl Shape3D,
+    shape2: &impl Shape3D
+) -> AResult<CompositeShape3D> {
 
     // Clone shape 2 model because we'll need to negate it to prep for subtract
     let mut to_remove = shape2.model().clone();
+
     // Prepare shape2 to subtract from shape 1
     to_remove.not();
 
