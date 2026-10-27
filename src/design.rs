@@ -1,4 +1,4 @@
-/// Data structure for automated creation and tracking of fab designs
+//! Data structure for automated creation and tracking of fab designs
 use std::{
     fmt,
     fs,
