@@ -37,18 +37,48 @@ pub trait HasVolume {
 pub trait Shape3D: HasVolume {
     /// The presence of a monstertruck::builder::Solid
     fn model(&self) -> &MSolid;
-}
 
+    /// Translate the shape using monstertruck::builder::translated
+    fn translate(&mut self, translation_vector: Vector3<f64>) -> AResult<()>;
+
+    /// Add the current shape to another shape, returning a new CompositeShape3D
+    fn add(&self, other: &impl Shape3D) -> AResult<CompositeShape3D>;
+
+    /// Subtract the current shape from another shape, returning a new CompositeShape3D
+    fn subtract(&self, other: &impl Shape3D) -> AResult<CompositeShape3D>;
+}
+#[macro_export]
 macro_rules! impl_shape3d {
     ($shape:ty) => {
+
         impl Shape3D for $shape {
+
             fn model(&self) -> &MSolid {
+
                 &self.model
+            }
+
+            fn translate(&mut self, translation_vector: Vector3<f64>) -> AResult<()> {
+
+                self.model = mbuilder::translated(&self.model, translation_vector);
+
+                Ok(())
+            }
+
+            fn add(&self, other: &impl Shape3D) -> AResult<CompositeShape3D> {
+
+                add(self, other)
+            }
+
+            fn subtract(&self, other: &impl Shape3D) -> AResult<CompositeShape3D> {
+
+                subtract(self, other)
             }
         }
     };
 }
 
+#[macro_export]
 macro_rules! f64_accessors {
     ($shape:ty { $($field:ident),* $(,)? }) => {
         impl $shape {
@@ -192,14 +222,33 @@ pub fn ball(radius: f64, center: Point3<f64>) -> AResult<Ball> {
 }
 
 // Create intermediate monstertruck Solid model for use by Ball constructor
-fn ball_model(radius:f64, center: Point3<f64>) -> AResult<MSolid> {
-    Ok(MSolid::new(vec![mbuilder::revolve_wire(
-        &circle_wire(center, radius, 0.0, 0.0)?,
+fn ball_model(radius: f64, center: Point3<f64>) -> AResult<MSolid> {
+
+    // Create a vertex starting at a point one radius away from center
+    let pole = mbuilder::vertex(center + Vector3::unit_y() * radius);
+
+    // Create a semicircle by tracing revolution of vertex halfway around
+    let semicircle: MWire = mbuilder::revolve(
+        &pole,
+        center,
+        Vector3::unit_x(),
+        mbuilder::SweepAngle::Partial(Rad(std::f64::consts::PI)),
+        3,
+    );
+
+    // Create the spherical shell that defines the ball volume
+    let shell = mbuilder::revolve_wire(
+        &semicircle,
         center,
         Vector3::unit_y(),
         mbuilder::SweepAngle::Closed,
-        10,
-    )]))
+        4,
+    );
+
+    // Our solid is created from shell definition
+    let solid = MSolid::new(vec![shell]);
+
+    Ok(solid)
 }
 
 /// A circular face, i.e., a 2D circular plane
@@ -402,17 +451,23 @@ pub fn rotate_xyz(
 }
 
 /// Add two fab shapes together to get a third that joins the two, if possible
-///
 pub fn add(shape1: &impl Shape3D, shape2: &impl Shape3D) -> AResult<CompositeShape3D> {
 
-    let result_model = msolid::or(
-        shape1.model(),
-        shape2.model(),
+    let model = msolid::or(
+        &shape1.model().clone(),
+        &shape2.model().clone(),
         TRIANGULATION_TOL
+    )
+    .context(
+        format!(
+            "Could not add models {:?} and {:?}",
+            shape1.model(),
+            shape2.model()
+        )
     )?;
 
     Ok(
-        CompositeShape3D { model: result_model }
+        CompositeShape3D { model }
     )
 }
 
@@ -424,23 +479,29 @@ pub fn subtract(
     shape2: &impl Shape3D
 ) -> AResult<CompositeShape3D> {
 
-    // Clone shape 2 model because we'll need to negate it to prep for subtract
-    let mut to_remove = shape2.model().clone();
-
-    // Prepare shape2 to subtract from shape 1
-    to_remove.not();
+    // Copy (ie clone) model from first, larger shape
+    let larger_shape = shape1.model().clone();
+    // Clone shape 2 as mutable because we'll need to negate it to prep for subtract
+    let to_remove = shape2.model().clone();
+    // Prepare shape2 to subtract from shape 1, copying again before negating
+    let mut to_remove_negated = to_remove.clone();
+    to_remove_negated.not(); // now to_remove_negated is indeed negated
 
     // Create resulting model that takes shape 2 from shape 1
     let result_model = msolid::and(
-        shape1.model(),
-        &to_remove,
+        &larger_shape,
+        &to_remove_negated,
         TRIANGULATION_TOL
+    )
+    .context(
+        format!("Unable to subtract {:?} from {:?}.", to_remove, larger_shape)
     )?;
 
     Ok (
         CompositeShape3D { model: result_model }
     )
 }
+
 
 /// Tolerance used by monstertruck in creating printable 3D models
 const TRIANGULATION_TOL: f64 = 0.01;
