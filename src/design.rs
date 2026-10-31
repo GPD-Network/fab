@@ -1,4 +1,7 @@
-//! Data structure for automated creation and tracking of fab designs
+//! Automated creation and tracking of fab designs
+//!
+//! For command-line interface documentation please see
+//! sustainableinference.com/fab/cli
 use std::{
     fmt,
     fs,

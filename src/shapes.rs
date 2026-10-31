@@ -175,10 +175,6 @@ fn cube_model(sidelen: f64) -> AResult<MSolid> {
 /// See [`monstertruck`'s `Solid` struct](https://docs.rs/monstertruck-topology/0.4.1/monstertruck_topology/struct.Solid.html)
 ///
 /// Use [`ball`], which wraps [`Ball::new`], to create one.
-///
-/// # Examples
-/// ```
-/// ```
 #[derive(Debug,PartialEq)]
 pub struct Ball {
     radius: f64,
