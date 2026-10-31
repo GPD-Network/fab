@@ -1,7 +1,7 @@
 //! Automated creation and tracking of fab designs
 //!
 //! For command-line interface documentation please see
-//! sustainableinference.com/fab/cli
+//! [sustainableinference.com/fab/cli](https://sustainableinference.com/fab/cli)
 use std::{
     fmt,
     fs,
