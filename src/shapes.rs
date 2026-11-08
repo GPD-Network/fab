@@ -39,7 +39,8 @@ pub trait Shape3D: HasVolume {
     fn model(&self) -> &MSolid;
 
     /// Translate the shape using monstertruck::builder::translated
-    fn translate(&mut self, translation_vector: Vector3<f64>) -> AResult<()>;
+    fn translate(self, translation_vector: Vector3<f64>) -> AResult<Self>
+    where Self: Sized;
 
     /// Add the current shape to another shape, returning a new CompositeShape3D
     fn add(&self, other: &impl Shape3D) -> AResult<CompositeShape3D>;
@@ -58,11 +59,11 @@ macro_rules! impl_shape3d {
                 &self.model
             }
 
-            fn translate(&mut self, translation_vector: Vector3<f64>) -> AResult<()> {
+            fn translate(mut self, translation_vector: Vector3<f64>) -> AResult<Self> {
 
                 self.model = mbuilder::translated(&self.model, translation_vector);
 
-                Ok(())
+                Ok(self)
             }
 
             fn add(&self, other: &impl Shape3D) -> AResult<CompositeShape3D> {
