@@ -22,11 +22,11 @@ fn test_cuboid_arithmetic() -> AResult<()> {
 
 fn _test_cuboid_volumes() -> AResult<()> {
     // Cubes/cuboids have their origin corner at Euclidian origin
-    let bigger_cube = cube(1.0)?;
+    let bigger_cube = cube(1.0);
     assert_eq!(bigger_cube.volume(), 1.0);
 
     // Check that a smaller cube has expected volume; mutable bc we'll move it
-    let smaller_cube = cube(0.5)?;
+    let smaller_cube = cube(0.5);
     assert_eq!(smaller_cube.volume(), 0.125);
 
     Ok(())
@@ -37,21 +37,19 @@ fn _test_cuboid_arithmetic() -> AResult<()> {
 
 
     // Subtract the smaller cube from the larger, is volume reduced as expected?
-    let bigger_cube = cube(1.0)?;
+    let bigger_cube = cube(1.0);
     // In this case we create a larger cube than needed,...
-    let mut smaller_cube = cube(0.6)?;
-    // ...and translate it an amount that offsets the oversize so have overlap
-    smaller_cube.translate(-1.0 * Vector3::new(0.1, 0.1, 0.1))?;
+    let smaller_cube = cube(0.6).translate(-1.0 * Vector3::new(0.1, 0.1, 0.1))?;
+    // // ...and translate it an amount that offsets the oversize so have overlap
+    // let smaller_cube;
     // All set to now subtract smaller from larger
     let result_cube = bigger_cube.subtract(&smaller_cube)?;
     assert_eq!(result_cube.volume(), 1.0 - 0.125);
 
     // Now test addition, starting with a bigger cube
-    let bigger_cube = cube(1.0)?;
+    let bigger_cube = cube(1.0);
     // Create a smaller cube of volume 0.125
-    let mut smaller_cube = cube(0.5)?;
-    // Translate, half of it in bigger
-    smaller_cube.translate(Vector3::new(0.25, 0.25, 0.75))?;
+    let smaller_cube = cube(0.5).translate(Vector3::new(0.25, 0.25, 0.75))?;
     // Ready to add the two
     let joined = bigger_cube.add(&smaller_cube)?;
 
