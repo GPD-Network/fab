@@ -1,8 +1,7 @@
 use anyhow::Result as AResult;
 use cgmath::Vector3;
 
-use fab::design::Design;
-use fab::shapes::{cube, cuboid, Cuboid, Shape3D};
+use fab::shapes::{cuboid, Cuboid, Shape3D};
 
 fn main() -> AResult<()> {
     test_design_rs_api()
@@ -16,7 +15,7 @@ fn test_main() -> AResult<()> {
 
 fn test_design_rs_api() -> AResult<()> {
 
-    assert!(false);
+    let punch = square_punch_3d(1.0, 0.2);
 
     Ok(())
 }
@@ -33,7 +32,7 @@ fn unit_z() -> Vector3<f64> {
     Vector3::new(0.0, 0.0, 1.0)
 }
 
-fn square_punch_3d(thickness: f64, sidelength: f64) ->
+fn square_punch_3d(sidelength: f64, thickness: f64) ->
     AResult<fab::shapes::CompositeShape3D> {
 
     let p1: Cuboid = cuboid(thickness, thickness, sidelength)?

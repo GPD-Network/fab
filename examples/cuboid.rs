@@ -18,7 +18,7 @@ fn test_cuboid_volumes() -> AResult<()> {
     let cuboidey = cuboid(1.0 , 2.0 , 4.0)?;
 
     // pron: cue-bee
-    let cubey = cube(2.0)?;
+    let cubey = cube(2.0);
 
     assert_eq!(cuboidey.volume(), cubey.volume());
 
