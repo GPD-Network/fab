@@ -30,11 +30,13 @@ use monstertruck::{
 };
 
 pub trait HasVolume {
+
     /// We define volume for implementations of Shape3D trait
     fn volume(&self) -> f64;
 }
 
 pub trait Shape3D: HasVolume {
+
     /// The presence of a monstertruck::builder::Solid
     fn model(&self) -> &MSolid;
 
@@ -43,7 +45,7 @@ pub trait Shape3D: HasVolume {
     where Self: Sized;
 
     /// Rotate the shape around its center
-    fn rotate_xyz(self, around_x: f64, around_y: f64, around_z: f64) -> AResult<Self>
+    fn rotate_xyz(&mut self, around_x: f64, around_y: f64, around_z: f64) -> AResult<&Self>
     where Self: Sized;
 
     /// Set the reference shape to share the same center as another shape
@@ -74,15 +76,22 @@ macro_rules! impl_shape3d {
                 Ok(self)
             }
 
-            fn rotate_xyz(mut self, around_x: f64, around_y: f64, around_z: f64) -> AResult<Self> {
+            fn rotate_xyz(&mut self, around_x: f64, around_y: f64, around_z: f64) -> AResult<&Self> {
 
-                self.model = $crate::shapes::rotate_xyz(self.model, around_x, around_y, around_z)?;
+                self.model =
+                    $crate::shapes::rotate_xyz(
+                        self.model.clone(),
+                        around_x,
+                        around_y,
+                        around_z
+                    )?;
+
                 Ok(self)
             }
 
             fn set_concentric(&mut self, other: &impl Shape3D) -> AResult<()> {
 
-                $crate::shapes::set_concentric(self, other);
+                $crate::shapes::set_concentric(self, other)?;
                 Ok(())
             }
 
@@ -463,7 +472,7 @@ pub fn circle_wire(
 
 /// Rotate a solid around its auto-calculated center
 pub fn rotate_xyz(
-    solid: MSolid,
+    mut solid: MSolid,
     around_x: f64,
     around_y: f64,
     around_z: f64,
@@ -473,21 +482,21 @@ pub fn rotate_xyz(
         .with_context(|| "Failed to extract bounding box.")?
         .center();
 
-    let solid = mbuilder::rotated(
+    solid = mbuilder::rotated(
         &solid,
         center,
         Vector3::unit_x(),
         Rad(around_x),
     );
 
-    let solid = mbuilder::rotated(
+    solid = mbuilder::rotated(
         &solid,
         center,
         Vector3::unit_y(),
         Rad(around_y),
     );
 
-    let solid = mbuilder::rotated(
+    solid = mbuilder::rotated(
         &solid,
         center,
         Vector3::unit_z(),
