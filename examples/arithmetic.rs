@@ -35,11 +35,13 @@ fn _test_cuboid_volumes() -> AResult<()> {
 
 fn _test_cuboid_arithmetic() -> AResult<()> {
 
-
     // Subtract the smaller cube from the larger, is volume reduced as expected?
     let bigger_cube = cube(1.0);
+
     // In this case we create a larger cube than needed,...
-    let smaller_cube = cube(0.6).translate(-1.0 * Vector3::new(0.1, 0.1, 0.1))?;
+    let mut smaller_cube = cube(0.6);
+    smaller_cube.translate(-1.0 * Vector3::new(0.1, 0.1, 0.1))?;
+
     // // ...and translate it an amount that offsets the oversize so have overlap
     // let smaller_cube;
     // All set to now subtract smaller from larger
@@ -48,8 +50,11 @@ fn _test_cuboid_arithmetic() -> AResult<()> {
 
     // Now test addition, starting with a bigger cube
     let bigger_cube = cube(1.0);
+
     // Create a smaller cube of volume 0.125
-    let smaller_cube = cube(0.5).translate(Vector3::new(0.25, 0.25, 0.75))?;
+    smaller_cube = cube(0.5);
+    smaller_cube.translate(Vector3::new(0.25, 0.25, 0.75))?;
+
     // Ready to add the two
     let joined = bigger_cube.add(&smaller_cube)?;
 

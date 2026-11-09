@@ -38,8 +38,16 @@ pub trait Shape3D: HasVolume {
     /// The presence of a monstertruck::builder::Solid
     fn model(&self) -> &MSolid;
 
-    /// Translate the shape using monstertruck::builder::translated
-    fn translate(self, translation_vector: Vector3<f64>) -> AResult<Self>
+    /// Translate the shape wrapping monstertruck::builder::translated
+    fn translate(&mut self, translation_vector: Vector3<f64>) -> AResult<&Self>
+    where Self: Sized;
+
+    /// Rotate the shape around its center
+    fn rotate_xyz(self, around_x: f64, around_y: f64, around_z: f64) -> AResult<Self>
+    where Self: Sized;
+
+    /// Set the reference shape to share the same center as another shape
+    fn set_concentric(&mut self, other: &impl Shape3D) -> AResult<()>
     where Self: Sized;
 
     /// Add the current shape to another shape, returning a new CompositeShape3D
@@ -48,6 +56,7 @@ pub trait Shape3D: HasVolume {
     /// Subtract the current shape from another shape, returning a new CompositeShape3D
     fn subtract(&self, other: &impl Shape3D) -> AResult<CompositeShape3D>;
 }
+
 #[macro_export]
 macro_rules! impl_shape3d {
     ($shape:ty) => {
@@ -59,11 +68,22 @@ macro_rules! impl_shape3d {
                 &self.model
             }
 
-            fn translate(mut self, translation_vector: Vector3<f64>) -> AResult<Self> {
+            fn translate(&mut self, translation_vector: Vector3<f64>) -> AResult<&Self> {
 
                 self.model = mbuilder::translated(&self.model, translation_vector);
-
                 Ok(self)
+            }
+
+            fn rotate_xyz(mut self, around_x: f64, around_y: f64, around_z: f64) -> AResult<Self> {
+
+                self.model = $crate::shapes::rotate_xyz(self.model, around_x, around_y, around_z)?;
+                Ok(self)
+            }
+
+            fn set_concentric(&mut self, other: &impl Shape3D) -> AResult<()> {
+
+                $crate::shapes::set_concentric(self, other);
+                Ok(())
             }
 
             fn add(&self, other: &impl Shape3D) -> AResult<CompositeShape3D> {
@@ -75,8 +95,33 @@ macro_rules! impl_shape3d {
 
                 subtract(self, other)
             }
+
         }
     };
+}
+
+
+/// Sets one shape, `moves`, to share the same center as another, `anchor`
+pub fn set_concentric(moves: &mut impl Shape3D, anchor: &impl Shape3D) -> AResult<()> {
+
+    // Calculate the vector difference between the center of other - self...
+    // First calculate center of shape that will be moved to center the anchor
+    let moves_center =
+        mbounding::certified_solid_bounding_box(moves.model())
+            .with_context(||
+                "Failed to extract bounding box of shape to be centered.")?
+            .center();
+
+    // Second calcualte the center to where moves will be moved
+    let anchor_center =
+        mbounding::certified_solid_bounding_box(anchor.model())
+            .with_context(||
+                "Failed to extract bounding box of shape to be centered on.")?
+            .center();
+
+    moves.translate(anchor_center - moves_center)?;
+
+    Ok(())
 }
 
 #[macro_export]
@@ -419,10 +464,11 @@ pub fn circle_wire(
 /// Rotate a solid around its auto-calculated center
 pub fn rotate_xyz(
     solid: MSolid,
-    x_turns: f64,
-    y_turns: f64,
-    z_turns: f64,
+    around_x: f64,
+    around_y: f64,
+    around_z: f64,
 ) -> AResult<MSolid> {
+
     let center: Point3<f64> = mbounding::certified_solid_bounding_box(&solid)
         .with_context(|| "Failed to extract bounding box.")?
         .center();
@@ -431,21 +477,21 @@ pub fn rotate_xyz(
         &solid,
         center,
         Vector3::unit_x(),
-        Rad(x_turns * TAU),
+        Rad(around_x),
     );
 
     let solid = mbuilder::rotated(
         &solid,
         center,
         Vector3::unit_y(),
-        Rad(y_turns * TAU),
+        Rad(around_y),
     );
 
     let solid = mbuilder::rotated(
         &solid,
         center,
         Vector3::unit_z(),
-        Rad(z_turns * TAU),
+        Rad(around_z),
     );
 
     Ok(solid)

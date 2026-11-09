@@ -20,6 +20,7 @@ fn test_design_rs_api() -> AResult<()> {
     Ok(())
 }
 
+
 fn unit_x() -> Vector3<f64> {
     Vector3::new(1.0, 0.0, 0.0)
 }
@@ -35,15 +36,16 @@ fn unit_z() -> Vector3<f64> {
 fn square_punch_3d(sidelength: f64, thickness: f64) ->
     AResult<fab::shapes::CompositeShape3D> {
 
-    let p1: Cuboid = cuboid(thickness, thickness, sidelength)?
-        .translate(0.5 * (sidelength - thickness) * unit_x())?;
+    let p1: Cuboid = cuboid(thickness, thickness, sidelength)?;
 
-    let p2: Cuboid = cuboid(thickness, thickness, sidelength)?
-        .translate(0.5 * (sidelength - thickness) * unit_y())?;
+    let mut p2: Cuboid = cuboid(thickness, thickness, sidelength)?;
+    p2.translate(0.5 * (sidelength - thickness) * unit_y())?;
 
-    let p3: Cuboid = cuboid(thickness, thickness, sidelength)?
-        .translate(0.5 * (sidelength - thickness) * unit_z())?;
+    let mut p3: Cuboid = cuboid(thickness, thickness, sidelength)?;
+    p3.translate(0.5 * (sidelength - thickness) * unit_z())?;
 
+    p2.set_concentric(&p1)?;
+    p3.set_concentric(&p1)?;
 
     p1.add(&p2)?.add(&p3)
 }
