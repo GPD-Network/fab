@@ -2,7 +2,7 @@
 name = "fab"
 version = "0.1.0"
 edition = "2024"
-default-run = "fab"
+
 
 [dependencies]
 anyhow = "1.0.104"
@@ -11,11 +11,3 @@ chrono = { version = "0.4.45", features = ["clock"] }
 clap = { version = "4.6.7", features = ["derive"] }
 monstertruck = { version = "0.4.1", features = ["full"] }
 toml_edit = "0.25.17"
-
-[package.metadata.docs.rs]
-cargo_args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
-
-[lints.rustdoc]
-private_doc_tests = "warn"
-redundant_explicit_links = "deny"
-unescaped_backticks = "deny"
